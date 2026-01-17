@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from rag import ingest, retrieve
+from backend.rag import ingest, retrieve
 from openai import OpenAI
 from fastapi.middleware.cors import CORSMiddleware
 import time

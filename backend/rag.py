@@ -66,7 +66,7 @@ def retrieve(query):
         matched = [c for c in mock_chunks if any(word in c.lower() for word in query_words)]
         return matched[:4] if matched else mock_chunks[:1]
     
-    from db import supabase
+    from backend.db import supabase
     q_embedding = embed(query)
 
     res = supabase.rpc("match_documents", {

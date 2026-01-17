@@ -42,7 +42,7 @@ def ingest(text):
         mock_chunks = chunk_text(text)
         return
     
-    from db import supabase
+    from backend.db import supabase
     chunks = chunk_text(text)
 
     for i, chunk in enumerate(chunks):

@@ -1,33 +1,10 @@
-from supabase import create_client, Client
-from dotenv import load_dotenv
 import os
+from supabase import create_client
 
-load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_KEY")
+if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+    raise RuntimeError("Supabase environment variables not set")
 
-#database file to connect with supabase
-if not url or not key or url.startswith("your_"):
-    print("WARNING: SUPABASE_URL or SUPABASE_KEY not set. Using mock data.")
-    class MockSupabase:
-        class Table:
-            def insert(self, data):
-                class InsertQuery:
-                    def execute(self):
-                        return type('Result', (), {'data': [data]})()
-                return InsertQuery()
-        
-        def table(self, name):
-            return self.Table()
-        
-        def rpc(self, name, params):
-            class RpcQuery:
-                def execute(self):
-                    return type('Result', (), {'data': []})()
-            return RpcQuery()
-    
-    supabase = MockSupabase()
-else:
-    supabase: Client = create_client(url, key)
-
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)

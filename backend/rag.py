@@ -1,25 +1,17 @@
 import uuid
-import os
 from openai import OpenAI
 import cohere
+from backend.db import supabase
 
-USE_MOCK = (
-    os.getenv("OPENAI_API_KEY", "").startswith("your_") or 
-    not os.getenv("OPENAI_API_KEY") or
-    os.getenv("SUPABASE_URL", "").startswith("your_") or 
-    not os.getenv("SUPABASE_URL")
-)
-
-if not USE_MOCK:
-    client = OpenAI()
-    co = cohere.Client()
+# Clients
+openai_client = OpenAI()
+co = cohere.Client()
 
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 120
 
-mock_chunks = []
 
-def chunk_text(text):
+def chunk_text(text: str):
     chunks = []
     start = 0
     while start < len(text):
@@ -29,20 +21,17 @@ def chunk_text(text):
     return chunks
 
 
-def embed(text):
-    return client.embeddings.create(
+def embed(text: str):
+    return openai_client.embeddings.create(
         model="text-embedding-3-small",
         input=text
     ).data[0].embedding
 
 
-def ingest(text):
-    global mock_chunks
-    if USE_MOCK:
-        mock_chunks = chunk_text(text)
+def ingest(text: str):
+    if not text.strip():
         return
-    
-    from backend.db import supabase
+
     chunks = chunk_text(text)
 
     for i, chunk in enumerate(chunks):
@@ -56,28 +45,22 @@ def ingest(text):
             "position": i
         }).execute()
 
-#retrieve the data from the supabase 
-def retrieve(query):
-    if USE_MOCK:
-        global mock_chunks
-        if not mock_chunks:
-            return []
-        query_words = query.lower().split()
-        matched = [c for c in mock_chunks if any(word in c.lower() for word in query_words)]
-        return matched[:4] if matched else mock_chunks[:1]
-    
-    from backend.db import supabase
+
+def retrieve(query: str):
     q_embedding = embed(query)
 
-    res = supabase.rpc("match_documents", {
-        "query_embedding": q_embedding,
-        "match_count": 8
-    }).execute()
+    res = supabase.rpc(
+        "match_documents",
+        {
+            "query_embedding": q_embedding,
+            "match_count": 8
+        }
+    ).execute()
 
-    docs = [r["content"] for r in res.data]
-    
-    if not docs:
+    if not res.data:
         return []
+
+    docs = [row["content"] for row in res.data]
 
     reranked = co.rerank(
         query=query,
@@ -86,4 +69,3 @@ def retrieve(query):
     )
 
     return [docs[r.index] for r in reranked.results]
-

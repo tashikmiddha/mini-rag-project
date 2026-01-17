@@ -76,7 +76,7 @@ A Retrieval-Augmented Generation (RAG) application that lets users input text, s
 
 ### 1. Clone and Install
 ```bash
-git clone <your-repo>
+git clone https://github.com/tashikmiddha/mini-rag-project.git
 cd intern project
 pip install -r backend/requirement.txt
 cd frontend && npm install

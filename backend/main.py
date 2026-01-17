@@ -4,41 +4,55 @@ from backend.rag import ingest, retrieve
 from openai import OpenAI
 from fastapi.middleware.cors import CORSMiddleware
 import time
-import os
 
-USE_MOCK = os.getenv("OPENAI_API_KEY", "").startswith("your_") or not os.getenv("OPENAI_API_KEY")
-
-app = FastAPI()
+app = FastAPI(title="Mini RAG Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],        # tighten in prod if needed
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+client = OpenAI()
+
+
 class Query(BaseModel):
     document: str
     question: str
 
+
 @app.post("/query")
 def query_rag(data: Query):
+    """
+    1. Ingest user document into vector DB
+    2. Retrieve + rerank relevant chunks
+    3. Generate grounded answer with citations
+    """
     start = time.time()
 
+    # 1️⃣ Ingest document
     ingest(data.document)
+
+    # 2️⃣ Retrieve relevant context
     contexts = retrieve(data.question)
 
     if not contexts:
-        return {"answer": "No relevant info found.", "sources": []}
+        return {
+            "answer": "No relevant information found in the provided document.",
+            "sources": [],
+            "time": round(time.time() - start, 2)
+        }
 
+    # 3️⃣ Build citation-aware context
     context_text = ""
     for i, c in enumerate(contexts):
-        context_text += f"[{i+1}] {c}\n"
+        context_text += f"[{i+1}] {c}\n\n"
 
     prompt = f"""
-Answer using ONLY the context.
-Cite facts like [1], [2].
+Answer the question using ONLY the context below.
+Cite facts inline like [1], [2].
 
 Context:
 {context_text}
@@ -46,16 +60,9 @@ Context:
 Question:
 {data.question}
 """
-    
-    if USE_MOCK:
-        return {
-            "answer": f"Based on the document: {contexts[0][:200]}...",
-            "sources": contexts,
-            "time": round(time.time() - start, 2)
-        }
 
-    client = OpenAI()
-    res = client.chat.completions.create(
+    # 4️⃣ LLM answer
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "Answer using provided context only."},
@@ -65,8 +72,7 @@ Question:
     )
 
     return {
-        "answer": res.choices[0].message.content,
+        "answer": response.choices[0].message.content,
         "sources": contexts,
         "time": round(time.time() - start, 2)
     }
-
